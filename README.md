@@ -1,7 +1,7 @@
 # Research Assistant RAG
 
 A Retrieval-Augmented Generation research assistant built with Flask, LangChain,
-FAISS, ChromaDB, and the OpenAI API — designed with token-cost efficiency in mind.
+FAISS, ChromaDB, Groq, and local Hugging Face embeddings.
 
 ## Features
 - Hybrid vector storage: FAISS for a large static reference corpus, ChromaDB for
@@ -13,7 +13,7 @@ FAISS, ChromaDB, and the OpenAI API — designed with token-cost efficiency in m
 
 ## Architecture
 Client → Flask API (auth, sessions, rate limiting) → LangChain orchestrator
-(retriever router + prompt builder) → FAISS / ChromaDB → OpenAI API → Redis
+(retriever router + prompt builder) → FAISS / ChromaDB → Groq API → Redis
 response cache.
 
 ## Setup
@@ -24,7 +24,8 @@ cd research-assistant-rag
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env       # then fill in OPENAI_API_KEY
+copy .env.example .env     # Windows; then fill in GROQ_API_KEY
+# macOS/Linux: cp .env.example .env
 \`\`\`
 
 ## Build the static index
@@ -33,6 +34,9 @@ Place source PDFs in `data/raw/core_corpus/`, then:
 \`\`\`bash
 python scripts/build_faiss_index.py
 \`\`\`
+
+The index uses the local `sentence-transformers/all-MiniLM-L6-v2` embedding
+model. Groq is used only for answer generation, so no OpenAI API key is needed.
 
 ## Run
 
@@ -50,6 +54,13 @@ docker compose up --build
 |---|---|---|
 | `/health` | GET | Health check |
 | `/query` | POST | `{"question": "..."}` → answer + sources |
+| `/add-document` | POST | Add text to the dynamic document store |
+
+## Local prerequisites
+
+- Python 3.11+
+- A Groq API key from [console.groq.com](https://console.groq.com/)
+- Redis running locally for response caching (the app still starts if Redis is unavailable)
 
 ## Roadmap
 - [x] Ingestion pipeline
