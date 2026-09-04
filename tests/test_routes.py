@@ -16,11 +16,17 @@ def client(app):
     return app.test_client()
 
 
-def test_health_check(client):
-    """Test health endpoint."""
+def test_health_check(client, monkeypatch):
+    """Test health endpoint reports component state."""
+    class HealthyRetriever:
+        def health_status(self):
+            return {'faiss': 'healthy', 'chroma': 'healthy'}
+
+    monkeypatch.setattr('app.routes.get_retriever', lambda: HealthyRetriever())
     response = client.get('/health')
     assert response.status_code == 200
     assert response.json['status'] == 'healthy'
+    assert response.json['components']['redis'] == 'degraded'
 
 
 def test_query_missing_question(client):

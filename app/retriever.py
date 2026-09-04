@@ -12,11 +12,7 @@ class RAGRetriever:
     
     def __init__(self):
         self.embeddings = HuggingFaceEmbeddings(model_name=Config.EMBEDDING_MODEL)
-        self.llm = ChatGroq(
-            api_key=Config.GROQ_API_KEY,
-            model=Config.GROQ_MODEL,
-            temperature=0.7
-        )
+        self.llm = None
         self.faiss_store = None
         self.chroma_store = None
         
@@ -35,16 +31,22 @@ class RAGRetriever:
             except Exception as e:
                 print(f"Warning: Could not load FAISS index: {e}")
         
-        # Load ChromaDB collection if it exists
-        if os.path.exists(Config.CHROMA_PERSIST_DIR):
-            try:
-                self.chroma_store = Chroma(
-                    collection_name=Config.CHROMA_COLLECTION,
-                    persist_directory=Config.CHROMA_PERSIST_DIR,
-                    embedding_function=self.embeddings
-                )
-            except Exception as e:
-                print(f"Warning: Could not load ChromaDB: {e}")
+        try:
+            os.makedirs(Config.CHROMA_PERSIST_DIR, exist_ok=True)
+            self.chroma_store = Chroma(
+                collection_name=Config.CHROMA_COLLECTION,
+                persist_directory=Config.CHROMA_PERSIST_DIR,
+                embedding_function=self.embeddings
+            )
+        except Exception as e:
+            print(f"Warning: Could not load ChromaDB: {e}")
+
+    def health_status(self):
+        """Return readiness state for the local vector stores."""
+        return {
+            "faiss": "healthy" if self.faiss_store is not None else "unhealthy",
+            "chroma": "healthy" if self.chroma_store is not None else "unhealthy",
+        }
     
     def retrieve(self, question: str, top_k: int = 5):
         """Retrieve relevant documents for a question."""
@@ -78,6 +80,15 @@ class RAGRetriever:
     
     def generate_answer(self, question: str, context_docs: list, conversation_history: list = None):
         """Generate answer using LLM with retrieved context."""
+        if self.llm is None:
+            if not Config.GROQ_API_KEY:
+                raise RuntimeError("GROQ_API_KEY is required for /query")
+            self.llm = ChatGroq(
+                api_key=Config.GROQ_API_KEY,
+                model=Config.GROQ_MODEL,
+                temperature=0.7
+            )
+
         # Build context from documents
         context = "\n\n".join([doc.page_content for doc in context_docs])
         

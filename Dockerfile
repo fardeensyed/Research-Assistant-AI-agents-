@@ -1,18 +1,37 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends build-essential \
+	&& rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+	PYTHONUNBUFFERED=1 \
+	PORT=5000 \
+	FAISS_INDEX_PATH=/app/indexes/faiss_core \
+	CHROMA_PERSIST_DIR=/app/data/chroma_dynamic
 
 WORKDIR /app
 
-# Copy requirements
-COPY requirements.txt .
+COPY --from=builder /install /usr/local
+COPY app ./app
+COPY run.py requirements.txt ./
+# The generated index is a build artifact; raw PDFs are never needed at runtime.
+COPY indexes ./indexes
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN useradd --create-home --uid 10001 appuser \
+	&& mkdir -p /app/data \
+	&& chown -R appuser:appuser /app
 
-# Copy application
-COPY . .
-
-# Expose port
+USER appuser
 EXPOSE 5000
 
-# Run application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "run:app"]
+# One gthread worker keeps memory bounded; two threads provide limited I/O concurrency
+# without duplicating the embedding model across multiple processes on the free tier.
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--worker-class", "gthread", "--timeout", "120", "run:app"]

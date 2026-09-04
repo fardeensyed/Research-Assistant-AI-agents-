@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify, current_app
 from app.retriever import RAGRetriever
 from app.cache import ResponseCache
 from app import limiter
-import json
 
 api_bp = Blueprint('api', __name__)
 
@@ -21,11 +20,32 @@ def get_retriever():
 @api_bp.route('/health', methods=['GET'])
 @limiter.limit("10/minute")
 def health():
-    """Health check endpoint."""
+    """Report readiness of the app's local stores and optional cache."""
+    components = {"app": "healthy"}
+    try:
+        components.update(get_retriever().health_status())
+    except Exception as error:
+        components.update({"faiss": "unhealthy", "chroma": "unhealthy"})
+        components["vector_store_error"] = str(error)
+
+    redis_client = current_app.redis_client
+    if redis_client is None:
+        components["redis"] = "degraded"
+    else:
+        try:
+            redis_client.ping()
+            components["redis"] = "healthy"
+        except Exception:
+            components["redis"] = "degraded"
+
+    core_healthy = all(
+        components.get(name) == "healthy" for name in ("app", "faiss", "chroma")
+    )
     return jsonify({
-        "status": "healthy",
-        "service": "research-assistant-rag"
-    }), 200
+        "status": "healthy" if core_healthy else "unhealthy",
+        "service": "research-assistant-rag",
+        "components": components,
+    }), (200 if core_healthy else 503)
 
 
 @api_bp.route('/query', methods=['POST'])

@@ -48,11 +48,20 @@ python run.py
 docker compose up --build
 \`\`\`
 
+The Docker image expects the generated `indexes/faiss_core` directory in the
+build context. It copies that pre-built FAISS index into the image and does not
+need the raw PDF corpus at runtime. Docker starts Gunicorn with one `gthread`
+worker and two threads to keep memory bounded on small instances.
+
+Set `GROQ_API_KEY` in the runtime environment or in a local `.env` file; it is
+never copied into the image. Redis is optional: the cache degrades gracefully
+and `/health` reports Redis as `degraded` when it is unreachable.
+
 ## API
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/health` | GET | Health check |
+| `/health` | GET | Component-level readiness check |
 | `/query` | POST | `{"question": "..."}` → answer + sources |
 | `/add-document` | POST | Add text to the dynamic document store |
 

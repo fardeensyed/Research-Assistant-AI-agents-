@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
@@ -21,13 +19,17 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
-      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:?Set FLASK_SECRET_KEY in the environment}
     depends_on:
       - redis
     volumes:
-      - ./indexes:/app/indexes
       - ./data:/app/data
-    command: gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 run:app
+    command: gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 2 --worker-class gthread --timeout 120 run:app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   redis-data:
