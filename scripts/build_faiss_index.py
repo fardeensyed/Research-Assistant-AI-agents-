@@ -1,6 +1,12 @@
 """Build FAISS index from PDF corpus."""
 import os
+import sys
 from pathlib import Path
+
+# Make the sibling app package importable when this file is run directly.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
@@ -8,7 +14,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from app.config import Config
 
 # PDF source directory
-PDF_SOURCE_DIR = "data/raw/core_corpus"
+PDF_SOURCE_DIR = PROJECT_ROOT / "data" / "raw" / "core_corpus"
 INDEX_OUTPUT_PATH = Config.FAISS_INDEX_PATH
 
 
