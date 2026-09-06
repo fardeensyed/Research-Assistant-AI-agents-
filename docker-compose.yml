@@ -15,6 +15,7 @@ services:
       - "5000:5000"
     environment:
       - FLASK_ENV=production
+      - PORT=5000
       - REDIS_URL=redis://redis:6379/0
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
@@ -24,7 +25,6 @@ services:
       - redis
     volumes:
       - ./data:/app/data
-    command: gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 2 --worker-class gthread --timeout 120 run:app
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 30s
